@@ -1,0 +1,138 @@
+<?xml version="1.0"?>
+<robot name="robot_rrr" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ================= MATERIALES ================= -->
+  <material name="blue">
+    <color rgba="0.2 0.5 0.8 1"/>
+  </material>
+  <material name="grey">
+    <color rgba="0.6 0.6 0.6 1"/>
+  </material>
+  <material name="red">
+    <color rgba="1.0 0.0 0.1 1"/>
+  </material>
+  <material name="yellow">
+    <color rgba="1.0 1.0 0.0 1"/>
+  </material>
+  <material name="green">
+    <color rgba="0.0 1.0 0.0 1"/>
+  </material>
+
+  <!-- ================= ESLABONES Y JUNTAS ================= -->
+
+<!-- Definimos eslabones-->
+  <!-- Base Link: La base del robot -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder radius="0.08" length="0.05"/>
+      </geometry>
+      <material name="grey"/>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+    </visual>
+  </link>
+
+  <!-- Eslabón 1: Columna vertical -->
+  <link name="link1">
+    <visual>
+      <geometry>
+        <cylinder radius="0.04" length="0.25"/> <!-- Menor a 0.5m -->
+      </geometry>
+      <material name="blue"/>
+      <origin xyz="0 0 0.125" rpy="0 0 0"/> <!-- El centro geométrico está a la mitad de su altura -->
+    </visual>
+  </link>
+
+  <!-- Eslabón 2: Brazo horizontal -->
+  <link name="link2">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.30"/> <!-- Menor a 0.5m -->
+      </geometry>
+      <material name="red"/>
+      <!-- Rotamos el cilindro para que quede horizontal (pitch 90 grados) -->
+      <origin xyz="0.15 0 0" rpy="0 1.5708 0"/> 
+    </visual>
+  </link>
+
+  <!-- Eslabón 3: Brazo horizontal -->
+  <link name="link3">
+    <visual>
+      <geometry>
+        <cylinder radius="0.03" length="0.30"/> <!-- Menor a 0.5m -->
+      </geometry>
+      <material name="yellow"/>
+      <!-- Rotamos el cilindro para que quede horizontal (pitch 90 grados) -->
+      <origin xyz="0.15 0 0" rpy="0 1.5708 0"/> 
+    </visual>
+  </link>
+
+  <!-- Eslabón 4: Brazo vertical-->
+  <link name="link4">
+    <visual>
+      <geometry>
+        <cylinder radius="0.02" length="0.15"/> <!-- Menor a 0.5m -->
+      </geometry>
+      <material name="green"/>
+      <!-- Lo desplazamos hacia abajo (-Z) -->
+      <origin xyz="0 0 -0.075" rpy="0 0 0"/>
+    </visual>
+  </link>
+
+  <!-- Eslabón 5: Efector final hacia abajo -->
+  <link name="link5">
+    <visual>
+      <geometry>
+        <cylinder radius="0.01" length="0.1"/> <!-- Menor a 0.5m -->
+      </geometry>
+      <material name="grey"/>
+      <!-- Lo desplazamos hacia abajo (-Z) -->
+      <origin xyz="0 0 -0.05" rpy="0 0 0"/>
+    </visual>
+  </link>
+
+<!-- Definimos juntas -->
+  <!-- Junta 1: Fija para mantener unidos los 2 cilindros de la base-->
+  <joint name="joint1" type="fixed">
+  <parent link="base_link"/>
+  <child link="link1"/>
+  <origin xyz="0 0 0.05" rpy="0 0 0"/> 
+  </joint>
+
+  <!-- Junta 2: Revolución sobre el eje z -->
+  <joint name="joint2" type="revolute">
+    <parent link="link1"/>
+    <child link="link2"/>
+    <origin xyz="0 0 0.25" rpy="0 0 0"/> <!-- Se coloca en la punta del link1 -->
+    <axis xyz="0 0 1"/> <!-- Gira en z -->
+    <limit lower="-3.14" upper="3.14" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Junta 3: Revolución sobre el eje z -->
+  <joint name="joint3" type="revolute">
+    <parent link="link2"/>
+    <child link="link3"/>
+    <origin xyz="0.27 0 0.05" rpy="0 0 0"/> <!-- Se coloca en la punta del link2 -->
+    <axis xyz="0 0 1"/> <!-- Gira en z -->
+    <limit lower="-3.1416" upper="3.1416" effort="10" velocity="1"/>
+  </joint>
+
+  <!-- Junta 4: Fija-->
+  <joint name="joint4" type="fixed">
+  <parent link="link3"/>
+  <child link="link4"/>
+  <origin xyz="0.3 0 0" rpy="0 0 0"/> 
+  </joint>
+
+  <!-- Junta 5: Prismática en el eje z -->
+  <joint name="joint5" type="prismatic">
+    <parent link="link4"/>
+    <child link="link5"/>
+    <origin xyz="0 0 -0.15" rpy="0 0 0"/> <!-- Se coloca en la punta del link4 -->
+    <axis xyz="0 0 1"/> <!-- Se mueve en z -->
+    <limit lower="0" upper="0.08" effort="10" velocity="1"/>
+  </joint>
+
+  
+
+</robot>
