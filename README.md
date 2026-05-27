@@ -1,7 +1,7 @@
 # Robotica2026-2
 Descripción
 
-Repositorio donde se subiran las practiicas de robotica realizadas durante el semestre 2026-2
+Repositorio donde se subiran las practícas de robotica realizadas durante el semestre 2026-2
 
 Integrantes:
 
