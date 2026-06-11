@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import rclpy
+import numpy as np
 from rclpy.node import Node
 from robot_kinematics.kinematics import Robot
 from geometry_msgs.msg import Twist, PointStamped
@@ -66,6 +67,7 @@ class PublicadorTrayectoria(Node):
       return
     self.is_moving = True
     self.get_logger().info("Posición recibida (Clic): {}".format(str(msg.point)))
+    
     
     
     idx_shoulder = self.js_current.name.index("shoulder_joint")

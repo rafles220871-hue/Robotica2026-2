@@ -1,76 +1,201 @@
 #!/usr/bin/env python3
-import numpy as np
+from sympy import *
 import matplotlib.pyplot as plt
-import math
+import numpy as np 
 
 class Robot():
-  # Actualizamos las medidas del urdf
-  def __init__(self, l=(0.2, 0.3, 0.5)):
-    self.l = l
-    self.dt = 0.0
+  def __init__(self, l:tuple[float]=(0.2, 0.3, 0.5)):
+    th1, th2, th3 = symbols("theta_1,theta_2,theta_3")
 
-  def def_tray(self, t_f=2.0, frec=15.0, 
-               th_i=(0.1, 0.1, 0.1), 
-               xi_f=(0.6, 0.1, 0.0)):
-    self.dt = 1.0 / frec
+    # 1. Transformaciones 3D 
+    T_0_1 = self.tr_h(alpha=th1)
+
+    T_1_2 = self.tr_h(z=l[0]) \
+           * self.tr_h(gamma=pi/2) \
+           * self.tr_h(alpha=th2)
+
+    T_2_3 = self.tr_h(x=l[1]) \
+           * self.tr_h(alpha=th3)
+
+    T_3_p = self.tr_h(x=l[2])
+
+    T_0_p = T_0_1 * T_1_2 * T_2_3 * T_3_p
+    T_0_p = simplify(T_0_p)
+    
+    # 2. Vector de postura 3D (X, Y, Z)
+    xi_0_p = Matrix([T_0_p[0, 3],
+                     T_0_p[1, 3],
+                     T_0_p[2, 3]])
+                     
+    # 3. Jacobiano 3x3
+    J = xi_0_p.jacobian(Matrix([th1, th2, th3]))
+    
+    # Velocidades espaciales deseadas
+    x_dot, y_dot, z_dot = symbols("x_dot, y_dot, z_dot")
+    t = symbols("t")
+    a_0, a_1, a_2, a_3, a_4, a_5 = symbols("a_0, a_1, a_2, a_3, a_4, a_5")
+    lam = a_0 + a_1 * t + a_2 * t**2 + a_3 * t**3 + a_4 * t**4 + a_5 * t**5    
+    lam_dot = diff(lam, t)
+    lam_dot_dot = diff(lam_dot, t)
+    
+    # Almacenar variables
+    self.th1, self.th2, self.th3 = th1, th2, th3
+    self.xi_0_p = xi_0_p
+
+    print(
+    xi_0_p.subs({
+        th1:0,
+        th2:0,
+        th3:0
+    }).evalf()
+)
+    
+    self.J = J # Guardamos J normal, no la inversa
+    self.x_dot, self.y_dot, self.z_dot = x_dot, y_dot, z_dot
+    self.a_0, self.a_1, self.a_2, self.a_3, self.a_4, self.a_5 = a_0, a_1, a_2, a_3, a_4, a_5
+    self.t = t
+    self.lam, self.lam_dot, self.lam_dot_dot = lam, lam_dot, lam_dot_dot
+
+  def def_tray(self, t_f:float=2, frec:float=100, 
+               th_i:tuple[float]=(0.1, 0.1, 0.1), 
+               xi_f:tuple[float]=(0.6, 0.1, 0)):
+    
+    # Evaluar a float desde el inicio
+    xi_i = self.xi_0_p.subs({self.th1: th_i[0], 
+                             self.th2: th_i[1], 
+                             self.th3: th_i[2]}).evalf() 
+    self.dt = 1.0/frec
     self.muestras = int(t_f * frec + 1)
+
+    eq1 = self.lam.subs({self.t: 0})
+    eq2 = self.lam.subs({self.t: t_f}) - 1
+    eq3 = self.lam_dot.subs({self.t: 0})
+    eq4 = self.lam_dot.subs({self.t: t_f})
+    eq5 = self.lam_dot_dot.subs({self.t: 0})
+    eq6 = self.lam_dot_dot.subs({self.t: t_f})
+    solutions = solve((eq1, eq2, eq3, eq4, eq5, eq6),
+                  (self.a_0, self.a_1, self.a_2, self.a_3, self.a_4, self.a_5))
     
-    x, y, z = xi_f
-    l0, l1, l2 = self.l
+    lam_s         = self.lam.subs(solutions)
+    lam_dot_s     = self.lam_dot.subs(solutions)
+    lam_dot_dot_s = self.lam_dot_dot.subs(solutions)
     
-    # 1. Cinemática Inversa Analítica Trigonométrica
-    # Ángulo de la base (paneo)
-    th1_f = math.atan2(y, x)
+    xi_f_mat = Matrix([xi_f[0], xi_f[1], xi_f[2]])
+    xi_eq         = xi_i + (xi_f_mat - xi_i) * lam_s
+    xi_dot_eq     = (xi_f_mat - xi_i) * lam_dot_s
+    xi_dot_dot_eq = (xi_f_mat - xi_i) * lam_dot_dot_s
     
-    # Distancia en el plano del brazo
-    r = math.sqrt(x**2 + y**2)
-    s = z - l0 # Altura respecto a la base del hombro
-    
-    # Ecuación del codo (Cálculo de hipotenusa y ley de cosenos)
-    D = (r**2 + s**2 - l1**2 - l2**2) / (2 * l1 * l2)
-    # Protegemos la matemática por si el usuario hace clic fuera del alcance máximo
-    D = max(min(D, 1.0), -1.0) 
-    
-    # Ángulo del codo (Configuración de "codo arriba" con el signo negativo)
-    th3_f = math.atan2(-math.sqrt(1 - D**2), D)
-    
-    # Ángulo del hombro
-    alpha = math.atan2(s, r)
-    beta = math.atan2(l2 * math.sin(th3_f), l1 + l2 * math.cos(th3_f))
-    th2_f = alpha - beta
-    
-    # 2. Generación de Trayectoria Suave en Espacio de Juntas
-    self.t_m = np.zeros((1, self.muestras))
-    self.th_m = np.zeros((3, self.muestras))
-    self.xi_m = np.zeros((3, self.muestras))
-    
-    th_start = np.array(th_i)
-    th_end = np.array([th1_f, th2_f, th3_f])
+    t_m = Matrix.zeros(1, self.muestras)
+    for i in range(self.muestras):
+      t_m[i] = self.dt * i
+      
+    xi_m         = Matrix.zeros(3, self.muestras)
+    xi_dot_m     = Matrix.zeros(3, self.muestras)
+    xi_dot_dot_m = Matrix.zeros(3, self.muestras)
     
     for i in range(self.muestras):
-        t = i * self.dt
-        self.t_m[0, i] = t
-        
-        # Perfil de velocidad polinomial suave (curva en S)
-        tau = t / t_f
-        s_t = 10 * tau**3 - 15 * tau**4 + 6 * tau**5
-        
-        # Interpolar los motores directamente hacia el objetivo
-        th_act = th_start + (th_end - th_start) * s_t
-        self.th_m[:, i] = th_act
-        
-        # Cinemática Directa (Para que las gráficas y logs muestren dónde está la punta)
-        r_act = l1 * math.cos(th_act[1]) + l2 * math.cos(th_act[1] + th_act[2])
-        z_act = l0 + l1 * math.sin(th_act[1]) + l2 * math.sin(th_act[1] + th_act[2])
-        x_act = r_act * math.cos(th_act[0])
-        y_act = r_act * math.sin(th_act[0])
-        
-        self.xi_m[0, i] = x_act
-        self.xi_m[1, i] = y_act
-        self.xi_m[2, i] = z_act
+      xi_m[:, i]         = xi_eq.subs({self.t: t_m[i]})
+      xi_dot_m[:, i]     = xi_dot_eq.subs({self.t: t_m[i]})
+      xi_dot_dot_m[:, i] = xi_dot_dot_eq.subs({self.t: t_m[i]})
+
+    th_m         = Matrix.zeros(3, self.muestras)
+    th_dot_m     = Matrix.zeros(3, self.muestras)
+    th_dot_dot_m = Matrix.zeros(3, self.muestras)
+    
+    th_m[:, 0] = Matrix([th_i[0], th_i[1], th_i[2]])
+    
+    # 4. Cálculo numérico de la cinemática inversa
+    for i in range(self.muestras):
+      # Evaluar Jacobiano en la posición actual
+      J_num = self.J.subs({self.th1: th_m[0, i], 
+                           self.th2: th_m[1, i], 
+                           self.th3: th_m[2, i]}).evalf()
+      
+      # Convertir a numpy array y calcular pseudoinversa
+      J_np = np.array(J_num).astype(np.float64)
+      J_inv_np = np.linalg.pinv(J_np) 
+      
+      # Vector de velocidad deseada actual
+      xi_dot_np = np.array([[xi_dot_m[0, i]], 
+                            [xi_dot_m[1, i]], 
+                            [xi_dot_m[2, i]]], dtype=np.float64)
+      
+      # th_dot = J_inv * xi_dot
+      th_dot_np = np.dot(J_inv_np, xi_dot_np)
+      
+      # Guardar resultados
+      th_dot_m[0, i] = th_dot_np[0, 0]
+      th_dot_m[1, i] = th_dot_np[1, 0]
+      th_dot_m[2, i] = th_dot_np[2, 0]
+      
+      if i < self.muestras - 1:
+        th_m[:, i+1] = th_m[:, i] + th_dot_m[:, i] * self.dt
+      if not (i == 0):
+        th_dot_dot_m[:, i-1] = (th_dot_m[:, i] - th_dot_m[:, i-1]) / self.dt
+      
+    self.xi_m = xi_m
+    self.xi_dot_m = xi_dot_m
+    self.xi_dot_dot_m = xi_dot_dot_m
+    self.th_m = th_m
+    self.th_dot_m = th_dot_m
+    self.th_dot_dot_m = th_dot_dot_m
+    self.t_m = t_m
+
+    xi_real = self.xi_0_p.subs({
+    self.th1: self.th_m[0,-1],
+    self.th2: self.th_m[1,-1],
+    self.th3: self.th_m[2,-1]
+    }).evalf()
+
+    print("\nObjetivo:")
+    print(xi_f_mat)
+
+    print("\nAlcanzado:")
+    print(xi_real)
+
+    print("\nError:")
+    print(xi_f_mat - xi_real)
+    
 
   def imp_tray(self):
-    pass
-    
+    fig, (x_g, y_g, z_g) = plt.subplots(nrows = 1, ncols = 3)
+    fig.suptitle("Posiciones del efector final")
+    x_g.set_title("X")
+    y_g.set_title("Y")
+    z_g.set_title("Z")
+    x_g.plot(self.t_m.T,  self.xi_m[0, :].T, color="RED")
+    y_g.plot(self.t_m.T,  self.xi_m[1, :].T, color="green")
+    z_g.plot(self.t_m.T, self.xi_m[2, :].T, color=(0,0,1))
+    plt.show()
+
   def imp_junt(self):
-    pass
+    fig, (th1_g, th2_g, th3_g) = plt.subplots(nrows = 1, ncols = 3)
+    fig.suptitle("Posiciones de las juntas")
+    th1_g.set_title("th1")
+    th2_g.set_title("th2")
+    th3_g.set_title("th3")
+    th1_g.plot(self.t_m.T,  self.th_m[0, :].T, color="RED")
+    th2_g.plot(self.t_m.T,  self.th_m[1, :].T, color="green")
+    th3_g.plot(self.t_m.T,  self.th_m[2, :].T, color=(0,0,1))
+    plt.show()
+
+  def tr_h(self, x=0, y=0, z=0, gamma=0, beta=0, alpha=0):
+    t_x = Matrix([[1, 0, 0, x], [0, cos(gamma), -sin(gamma), 0], [0, sin(gamma), cos(gamma), 0], [0, 0, 0, 1]])
+    t_y = Matrix([[cos(beta), 0, sin(beta), 0], [0, 1, 0, y], [-sin(beta), 0, cos(beta), 0], [0, 0, 0, 1]])
+    t_z = Matrix([[cos(alpha), -sin(alpha), 0, 0], [sin(alpha), cos(alpha), 0, 0], [0, 0, 1, z], [0, 0, 0, 1]])
+    tr = simplify(t_x * t_y * t_z)
+    return tr
+
+def main():
+  robot = Robot()
+  robot.def_tray()
+  robot.imp_tray()
+  robot.imp_junt()
+if __name__ == "__main__":
+  main()
+
+robot = Robot()
+
+robot.def_tray(
+    xi_f=(0.6,0.1,0)
+)
