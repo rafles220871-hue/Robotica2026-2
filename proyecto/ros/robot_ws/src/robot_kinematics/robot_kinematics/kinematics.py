@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import math
 
 class Robot():
-  # Actualizamos las medidas a las que definió tu equipo: 0.2, 0.3, 0.5
+  # Actualizamos las medidas del urdf
   def __init__(self, l=(0.2, 0.3, 0.5)):
     self.l = l
     self.dt = 0.0
@@ -18,7 +18,7 @@ class Robot():
     x, y, z = xi_f
     l0, l1, l2 = self.l
     
-    # 1. Cinemática Inversa Analítica Trigonométrica (¡A prueba de fallos!)
+    # 1. Cinemática Inversa Analítica Trigonométrica
     # Ángulo de la base (paneo)
     th1_f = math.atan2(y, x)
     
@@ -69,7 +69,6 @@ class Robot():
         self.xi_m[1, i] = y_act
         self.xi_m[2, i] = z_act
 
-  # Mantenemos las funciones vacías para que el publisher de tus compañeros no tire error al llamarlas
   def imp_tray(self):
     pass
     
