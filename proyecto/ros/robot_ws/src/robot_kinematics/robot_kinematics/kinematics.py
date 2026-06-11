@@ -29,7 +29,7 @@ class Robot():
                      
     # 3. Jacobiano 3x3
     J = xi_0_p.jacobian(Matrix([th1, th2, th3]))
-    
+
     # Velocidades espaciales deseadas
     x_dot, y_dot, z_dot = symbols("x_dot, y_dot, z_dot")
     t = symbols("t")
